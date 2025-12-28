@@ -60,6 +60,21 @@ print(result.model_dump_json(indent=2))
 }
 ```
 
+### Using RiskLevel
+
+```python
+from disposable_email_score import evaluate_email, RiskLevel
+
+result = evaluate_email("test@example.com")
+
+if result.decision == RiskLevel.BLOCK:
+    print("❌ Blocked!")
+elif result.decision == RiskLevel.REVIEW:
+    print("🟡 Needs review")
+else:
+    print("✅ Allowed")
+```
+
 ## How It Works
 
 ![Architecture](https://raw.githubusercontent.com/Harshit28j/disposable-email-score/main/docs/architecture.png)
