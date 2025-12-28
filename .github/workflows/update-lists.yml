@@ -1,0 +1,48 @@
+name: Update Domain Lists
+
+on:
+  schedule:
+    # Runs every Sunday at midnight UTC
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+    # Allows manual trigger from Actions tab
+
+jobs:
+  update-lists:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Fetch blocklist
+        run: |
+          curl -fsSL "${{ secrets.BLOCKLIST_URL }}" \
+            | sort -u > src/disposable_email_score/data/email_block_list.conf
+      - name: Fetch allowlist
+        run: |
+          curl -fsSL "${{ secrets.ALLOWLIST_URL }}" \
+            -o src/disposable_email_score/data/allow_email_list.conf
+
+      - name: Check for changes
+        id: git-check
+        run: |
+          git diff --quiet || echo "changes=true" >> $GITHUB_OUTPUT
+
+      - name: Commit and push if changed
+        if: steps.git-check.outputs.changes == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          BLOCKLIST_COUNT=$(wc -l < src/disposable_email_score/data/email_block_list.conf | tr -d ' ')
+          ALLOWLIST_COUNT=$(wc -l < src/disposable_email_score/data/allow_email_list.conf | tr -d ' ')
+          
+          git add .
+          git commit -m "chore: update domain lists from upstream" \
+                     -m "Blocklist: $BLOCKLIST_COUNT domains" \
+                     -m "Allowlist: $ALLOWLIST_COUNT domains"
+          git push
+

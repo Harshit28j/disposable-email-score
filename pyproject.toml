@@ -1,0 +1,80 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "disposable-email-score"
+version = "0.1.0"
+description = "A risk-scoring engine for email signups."
+readme = "README.md"
+requires-python = ">=3.8"
+license = "MIT"
+keywords = ["email", "validation", "disposable", "risk", "security", "abuse", "score", "spam", "temporary", "signup", "fraud"]
+authors = [
+  { name = "Harshit", email = "harshitjain0562@gmail.com" },
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+  "dnspython>=2.0.0",
+  "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.0.0",
+  "pytest-cov>=4.0.0",
+  "ruff>=0.1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Harshit28j/disposable-email-score"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/disposable_email_score"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "src/disposable_email_score/data/*.conf",
+]
+
+# Ruff configuration (fast Python linter + formatter)
+[tool.ruff]
+target-version = "py38"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+  "E",      # pycodestyle errors
+  "W",      # pycodestyle warnings
+  "F",      # pyflakes
+  "I",      # isort
+  "B",      # flake8-bugbear
+  "C4",     # flake8-comprehensions
+  "UP",     # pyupgrade
+]
+ignore = [
+  "E501",   # line too long (handled by formatter)
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+
+# Pytest configuration
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short"
+
