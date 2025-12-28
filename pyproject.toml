@@ -38,6 +38,7 @@ dev = [
 
 [project.urls]
 Homepage = "https://github.com/Harshit28j/disposable-email-score"
+Sponsors = "https://github.com/sponsors/Harshit28j"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/disposable_email_score"]
