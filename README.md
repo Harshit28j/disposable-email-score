@@ -62,7 +62,7 @@ print(result.model_dump_json(indent=2))
 
 ## How It Works
 
-![Architecture](docs/architecture.png)
+![Architecture](https://raw.githubusercontent.com/Harshit28j/disposable-email-score/main/docs/architecture.png)
 
 ## Risk Levels
 
