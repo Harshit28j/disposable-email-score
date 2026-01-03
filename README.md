@@ -77,7 +77,7 @@ else:
 
 ## How It Works
 
-![Architecture](https://raw.githubusercontent.com/Harshit28j/disposable-email-score/main/docs/architecture.png)
+![Architecture](docs/architecture.png)
 
 ## Risk Levels
 
