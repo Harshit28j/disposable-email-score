@@ -5,26 +5,126 @@ A robust, explainable risk-scoring engine for email signups. Detects disposable 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Twitter](https://img.shields.io/badge/Twitter-@harshitpy-1DA1F2?logo=twitter)](https://twitter.com/harshitpy)
+[![Slack](https://img.shields.io/badge/Slack-Join%20Community-4A154B?logo=slack)](https://join.slack.com/t/signguardworkspace/shared_invite/zt-448oj6uoy-ANp2rjwjQH3C0Th0rnUuVA)
+
+**The open-source package gives you fast, local disposable-email detection; SignGuard Hosted adds deep network verification and daily intelligence updates without the maintenance overhead.**
 
 ## Features
 
-- **Disposable Domain Detection** — Checks against 113,000+ known disposable email domains
+- **Disposable Domain Detection** — Checks against 74,778 known disposable email domains
 - **Typosquatting Detection** — Catches fake domains like `gmaiil.com`, `yahooo.com`
-- **MX Record Analysis** — Flags domains with missing or suspicious mail servers
+- **MX Risk Signals** — Detects suspicious or missing MX-related signals during local evaluation
 - **Role Account Detection** — Flags shared inboxes like `admin@`, `info@`, `sales@`
 - **Subdomain Detection** — Blocks `mail.tempmail.com` if `tempmail.com` is blocked
 - **Plus Alias Detection** — Detects `user+tag@gmail.com` patterns
 - **Allowlist Support** — Trusted domains bypass all checks
 - **Explainable Output** — Returns score, decision, signals, and human-readable reasons
 
-## 🚀 Hosted API (Coming Soon)
+## 🚀 Two Ways to Run
 
-Don't want to self-host? We're building a hosted API with:
-- Simple REST API — works with any language
-- No setup required — get an API key and start
-- Always updated blocklist
+This package is designed for flexibility. It provides fast, privacy-preserving local checks out of the box, and optional deep verification via the SignGuard Hosted API.
 
-**[👉 Join the waitlist](https://tally.so/r/9qXkd1)** to get early access + lifetime discount.
+### 1. Local / Offline Mode (Default)
+By default, the package runs entirely on your local machine using an embedded static list of 74,778 disposable domains.
+- **Fast:** Fast local heuristic detection.
+- **Private:** Email data is processed locally and does not leave your server.
+- **Offline:** No network dependencies.
+*(Note: Static lists are excellent for privacy and latency, but you must manually update this package to catch new domains since the static list is only updated in our repository releases).*
+
+### OSS vs Hosted Comparison
+
+| Capability | Local OSS | SignGuard Hosted |
+|---|---:|---:|
+| Disposable-domain detection | ✅ | ✅ |
+| Typosquatting detection | ✅ | ✅ |
+| Local/offline processing | ✅ | — |
+| Very low local latency | ✅ | — |
+| Automatic intelligence updates | — | ✅ Daily |
+| DNS/MX verification | — | ✅ |
+| SMTP mailbox verification | — | ✅ |
+| Catch-all detection | — | ✅ |
+| Domain-age/WHOIS signals | — | ✅ |
+| Custom allow/block rules | — | ✅ |
+| Dashboard & usage tracking | — | ✅ |
+| Centralized API management | — | ✅ |
+| MCP / AI Agent access | — | ✅ |
+
+### Why upgrade from the open-source package?
+
+This OSS package is intentionally designed to be highly useful on its own. **You do not have to pay SignGuard just to detect disposable domains.**
+
+However, the SignGuard Hosted API is built for teams that need:
+- **Daily managed intelligence updates** without application redeploys
+- **DNS/MX verification**
+- **Active SMTP verification** to assess mailbox-level deliverability and mail-server behavior
+- **Catch-all detection**
+- **Domain-age signals** to identify newly registered domains as an additional risk factor
+- **Centralized allow/block rules** 
+- **Dashboard and usage analytics**
+- **API key management**
+- **MCP / AI-agent integration**
+
+**Core Philosophy:** You don't pay for the domain list. You pay for the managed infrastructure and deeper network verification around it.
+
+---
+
+### 2. SignGuard Hosted API
+**[👉 Get your free SignGuard API Key here](https://signguard.co)**
+
+When configured, the SDK automatically routes checks through our centralized API to leverage deeper verification logic.
+
+- **Local fallback:** If the hosted API is unreachable due to network timeouts, connection errors, or server-side 5xx errors, the SDK instantly falls back to the local offline engine. *(Note: Invalid API keys (401) and rate limits (429) intentionally raise exceptions and do not fail open).*
+
+#### See SignGuard in action
+
+<p align="center">
+  <img src="docs/dashboard.png" alt="Manage SignGuard centrally — monitor usage, manage API keys, and configure security rules without changing application code.">
+  <br>
+  <em>Manage SignGuard centrally — monitor usage, manage API keys, and configure security rules without changing application code.</em>
+</p>
+
+<p align="center">
+  <img src="docs/mcp_agent.png" alt="Let AI agents make decisions using SignGuard's hosted email-risk signals — including domain age and catch-all detection.">
+  <br>
+  <em>Let AI agents make decisions using SignGuard's hosted email-risk signals — including domain age and catch-all detection.</em>
+</p>
+
+### Setup API Key (Zero Code Changes)
+Set the environment variable in your `.env` or shell. The library will automatically detect it and upgrade to hosted processing:
+```bash
+export SIGNGUARD_API_KEY="dsk_live_your_key_here"
+```
+
+### Run your check
+The library will automatically resolve the environment variable and query the API:
+```python
+from disposable_email_score import evaluate_email
+
+# Performs hosted validation if SIGNGUARD_API_KEY is set, otherwise local
+result = evaluate_email("user@tempmail.xyz")
+```
+
+### Alternative: Pass API Key directly
+```python
+result = evaluate_email("user@tempmail.xyz", api_key="dsk_live_your_key_here")
+```
+
+### API Key Security & Lifecycle
+
+- **Never expose your key to the frontend:** SignGuard API keys (`dsk_live_...`) are meant for backend/server-side use only.
+- **Revocation:** Deleted keys from your dashboard are revoked instantly (`401 Unauthorized`).
+- **Zero-Downtime Rotation:** Generate a new key, update your server, and then delete the old key.
+
+### Privacy
+- **Local Mode:** Email data is processed locally and does not leave your server.
+- **Hosted Mode:** Email addresses are sent to the SignGuard API for processing and are processed in memory. Standard operational telemetry and error monitoring may process request data when required for reliability and debugging.
+
+### HTTP Errors & Rate Limits
+
+If calling the API directly (without this SDK):
+- `401 Unauthorized`: Invalid or revoked API key.
+- `402 Payment Required`: Monthly quota exhausted.
+- `429 Too Many Requests`: Concurrency limit exceeded.
 
 ## Installation
 
@@ -74,6 +174,23 @@ elif result.decision == RiskLevel.REVIEW:
 else:
     print("✅ Allowed")
 ```
+
+## Benchmark Metrics
+
+Performance varies significantly depending on whether you are using the local engine or the Hosted API. 
+
+### Local / Fast Path
+- **Latency:** ~0.3ms average in a 1,000-request local benchmark
+
+### Hosted / Deep Verification
+*(Note: Network-dependent; latency varies based on DNS/SMTP verification and network conditions. The following metrics are indicative of a 100-request load test performed against the live SignGuard API from a standard cloud region.)*
+| Percentile | Response Time |
+|------------|---------------|
+| P50 | 6 ms |
+| P75 | 15 ms |
+| P90 | 380 ms |
+| P95 | 780 ms |
+| P99 | 820 ms |
 
 ## How It Works
 
@@ -145,7 +262,7 @@ SCORES = {
 
 ## Auto-Updates
 
-Domain lists are automatically updated weekly via GitHub Actions from [disposable-email-domains](https://github.com/disposable-email-domains/disposable-email-domains).
+The internal static domain list is automatically updated **monthly** via GitHub Actions fetching from our private upstream threat intelligence feed (`BLOCKLIST_URL`). When new domains are detected, a new version of the package is released. **You must upgrade/reinstall the Python package to receive these updated lists.**
 
 ## Development
 

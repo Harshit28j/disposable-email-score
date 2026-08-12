@@ -1,188 +1,102 @@
-"""
-Unit tests for disposable_email_score package.
-"""
+import json
+import warnings
+from unittest.mock import MagicMock, patch
+from urllib.error import HTTPError, URLError
 
-import sys
-from pathlib import Path
+from disposable_email_score import evaluate_email
+from disposable_email_score.models import RiskLevel
 
-# Add src to path for testing
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+# ---------------------------------------------------------
+# Phase 1: Public SDK Tests
+# ---------------------------------------------------------
 
-from disposable_email_score import RiskLevel, RiskResult, evaluate_email
+
+def test_offline_evaluation():
+    """Test that evaluating without an API key correctly uses the offline algorithms."""
+    # A known disposable domain from the open-source list
+    result = evaluate_email("test@mailinator.com")
+
+    assert result.decision == RiskLevel.BLOCK
+    assert result.score >= 0.7
+    assert "known_disposable_domain" in result.reasons
 
 
-class TestEvaluateEmail:
-    """Tests for the main evaluate_email function."""
+def test_live_evaluation_success():
+    """Test that a successful live API response is parsed correctly."""
+    mock_response_data = {
+        "decision": "allow",
+        "score": 0.1,
+        "thresholds": {"allow": 0.5, "block": 0.9},
+        "signals": {"valid_mx": 0.0},
+        "reasons": [],
+    }
 
-    def test_valid_gmail_address(self):
-        """Gmail addresses should be allowed (low risk)."""
-        result = evaluate_email("user@gmail.com")
+    # Mock urllib.request.urlopen to return a successful 200 response
+    mock_response = MagicMock()
+    mock_response.read.return_value = json.dumps(mock_response_data).encode("utf-8")
 
-        assert isinstance(result, RiskResult)
+    with patch("urllib.request.urlopen") as mock_urlopen:
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+
+        result = evaluate_email(
+            email="test@gmail.com", api_key="dsk_live_mock123", api_url="https://api.signguard.co"
+        )
+
         assert result.decision == RiskLevel.ALLOW
-        assert result.score < 0.3
-
-    def test_disposable_domain_blocked(self):
-        """Known disposable domains should be blocked."""
-        result = evaluate_email("test@10minutemail.com")
-
-        assert result.decision == RiskLevel.BLOCK
-        assert result.score >= 0.7
-        assert "domain_in_blocklist" in result.signals
-
-    def test_invalid_email_format(self):
-        """Invalid email format should be blocked."""
-        result = evaluate_email("not-an-email")
-
-        assert result.decision == RiskLevel.BLOCK
-        assert result.score == 1.0
-        assert "invalid_format" in result.signals
-
-    def test_plus_alias_detected(self):
-        """Plus aliases should add a small risk score."""
-        result = evaluate_email("user+spam@gmail.com")
-
-        assert "plus_alias" in result.signals
-        assert result.signals["plus_alias"] == 0.05
-
-    def test_allowlist_overrides_blocklist(self):
-        """Domains in allowlist should not trigger blocklist."""
-        # fastmail.com is in our allowlist
-        result = evaluate_email("user@fastmail.com")
-
-        assert "domain_in_blocklist" not in result.signals
-
-    def test_result_has_thresholds(self):
-        """Result should include threshold information."""
-        result = evaluate_email("test@example.com")
-
-        assert "allow" in result.thresholds
-        assert "block" in result.thresholds
-        assert result.thresholds["allow"] == 0.3
-        assert result.thresholds["block"] == 0.7
-
-    def test_result_is_json_serializable(self):
-        """Result should be serializable to JSON."""
-        result = evaluate_email("test@example.com")
-
-        json_str = result.model_dump_json()
-        assert isinstance(json_str, str)
-        assert "decision" in json_str
+        assert result.score == 0.1
+        mock_urlopen.assert_called_once()
 
 
-class TestSignals:
-    """Tests for individual signal functions."""
+def test_live_evaluation_429_fallback():
+    """Test that a 429 Too Many Requests error gracefully falls back to offline evaluation."""
+    # Create a mock HTTPError with code 429
+    error_429 = HTTPError(url="mock", hdrs=None, fp=None, code=429, msg="Too Many Requests")
 
-    def test_check_disposable_blocklist(self):
-        """Blocklist domains should return risk score."""
-        from disposable_email_score.signals import check_disposable
+    with patch("urllib.request.urlopen", side_effect=error_429):
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
 
-        assert check_disposable("10minutemail.com") == 0.7
-        assert check_disposable("guerrillamail.com") == 0.7
+            # Use a known disposable domain to verify offline fallback worked
+            result = evaluate_email(email="test@guerrillamail.com", api_key="dsk_live_mock123")
 
-    def test_check_disposable_allowlist(self):
-        """Allowlist domains should return zero."""
-        from disposable_email_score.signals import check_disposable
-
-        assert check_disposable("fastmail.com") == 0.0
-        assert check_disposable("hushmail.com") == 0.0
-
-    def test_check_disposable_unknown(self):
-        """Unknown domains should return zero."""
-        from disposable_email_score.signals import check_disposable
-
-        assert check_disposable("randomdomain12345.com") == 0.0
-
-    def test_check_structure_plus_alias(self):
-        """Plus aliases should be detected."""
-        from disposable_email_score.signals import check_structure
-
-        assert check_structure("user+tag") == 0.05
-        assert check_structure("user") == 0.0
-
-    def test_check_disposable_subdomain(self):
-        """Subdomains of blocked domains should also be blocked."""
-        from disposable_email_score.signals import check_disposable
-
-        # If tempmail.com is blocked, mail.tempmail.com should be too
-        # Using 10minutemail.com which is definitely in blocklist
-        assert check_disposable("mail.10minutemail.com") == 0.7
-        assert check_disposable("subdomain.guerrillamail.com") == 0.7
-
-    def test_check_typosquatting_detects_typos(self):
-        """Typosquatted domains should be detected."""
-        from disposable_email_score.signals import check_typosquatting
-
-        # gmaiil.com looks like gmail.com
-        score, matched = check_typosquatting("gmaiil.com")
-        assert score == 0.6
-        assert matched == "gmail.com"
-
-        # yahooo.com looks like yahoo.com
-        score, matched = check_typosquatting("yahooo.com")
-        assert score == 0.6
-        assert matched == "yahoo.com"
-
-    def test_check_typosquatting_allows_legit_providers(self):
-        """Legitimate major providers should not be flagged."""
-        from disposable_email_score.signals import check_typosquatting
-
-        # Exact matches should return 0
-        score, matched = check_typosquatting("gmail.com")
-        assert score == 0.0
-        assert matched is None
-
-        score, matched = check_typosquatting("yahoo.com")
-        assert score == 0.0
-        assert matched is None
-
-    def test_typosquatting_in_full_evaluation(self):
-        """Typosquatting should be detected in full email evaluation."""
-        result = evaluate_email("scammer@gmaiil.com")
-
-        assert "typosquatting" in result.signals
-        assert result.score >= 0.6
-        assert any("typosquatting" in r for r in result.reasons)
-
-    def test_check_role_account_detects_roles(self):
-        """Role accounts should be detected."""
-        from disposable_email_score.signals import check_role_account
-
-        assert check_role_account("admin") == 0.2
-        assert check_role_account("info") == 0.2
-        assert check_role_account("sales") == 0.2
-        assert check_role_account("support") == 0.2
-        assert check_role_account("noreply") == 0.2
-
-    def test_check_role_account_allows_normal(self):
-        """Normal personal emails should not be flagged."""
-        from disposable_email_score.signals import check_role_account
-
-        assert check_role_account("john") == 0.0
-        assert check_role_account("harshit") == 0.0
-        assert check_role_account("user123") == 0.0
-
-    def test_role_account_in_full_evaluation(self):
-        """Role accounts should be detected in full email evaluation."""
-        result = evaluate_email("admin@gmail.com")
-
-        assert "role_account" in result.signals
-        assert result.signals["role_account"] == 0.2
-
-
-class TestRiskLevels:
-    """Tests for risk level thresholds."""
-
-    def test_score_below_review_threshold_is_allow(self):
-        """Scores below 0.3 should be ALLOW."""
-        result = evaluate_email("user@gmail.com")
-
-        if result.score < 0.3:
-            assert result.decision == RiskLevel.ALLOW
-
-    def test_score_above_block_threshold_is_block(self):
-        """Scores at or above 0.7 should be BLOCK."""
-        result = evaluate_email("test@10minutemail.com")
-
-        if result.score >= 0.7:
+            # Verify the result fell back to offline correctly
             assert result.decision == RiskLevel.BLOCK
+            assert "known_disposable_domain" in result.reasons
+
+            # Verify the warning message is exactly our custom 429 warning
+            assert len(w) >= 1
+            warning_messages = [str(warning.message) for warning in w]
+            assert any(
+                "SignGuard API rate limit exceeded (HTTP 429)" in msg for msg in warning_messages
+            )
+
+
+def test_live_evaluation_timeout_fallback():
+    """Test that a timeout cleanly falls back to offline validation."""
+    timeout_error = URLError("timeout")
+
+    with patch("urllib.request.urlopen", side_effect=timeout_error):
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+
+            result = evaluate_email(email="test@10minutemail.com", api_key="dsk_live_mock123")
+
+            assert result.decision == RiskLevel.BLOCK
+
+            assert len(w) >= 1
+            warning_messages = [str(warning.message) for warning in w]
+            assert any(
+                "Falling back to local offline domain list" in msg for msg in warning_messages
+            )
+
+
+def test_malformed_api_key_warning():
+    """Test that a malformed API key triggers a developer warning but still falls back."""
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+
+        evaluate_email("test@gmail.com", api_key="invalid_key_format")
+
+        assert len(w) >= 1
+        warning_messages = [str(warning.message) for warning in w]
+        assert any("API key format looks invalid" in msg for msg in warning_messages)

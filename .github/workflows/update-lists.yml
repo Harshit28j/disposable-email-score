@@ -2,8 +2,8 @@ name: Update Domain Lists
 
 on:
   schedule:
-    # Runs every Sunday at midnight UTC
-    - cron: '0 0 * * 0'
+    # Runs monthly on the 1st at midnight UTC
+    - cron: '0 0 1 * *'
   workflow_dispatch:
     # Allows manual trigger from Actions tab
 
